@@ -1,47 +1,45 @@
-#include <immintrin.h>
-
-#include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#if defined(__linux)
+#ifdef USE_INTRINSICS
+#if defined(__AVX512F__) || defined(__AVX2__)
+#include <immintrin.h>
+#elif defined(__ARM_NEON)
+#include <arm_neon.h>
+#else
+#error "This code only supports x86-64 AVX2, AVX-512, and AArch64 NEON SIMD instructions."
+#endif /* defined(__AVX512F__) || defined(__AVX2__) */
+#endif /* USE_INTRINSICS */
+
+#ifdef __linux
 #define HAVE_POSIX_TIMER
 #include <time.h>
 #ifdef CLOCK_MONOTONIC
 #define CLOCKID CLOCK_MONOTONIC
 #else
 #define CLOCKID CLOCK_REALTIME
-#endif
-#elif defined(__APPLE__)
+#endif /* CLOCK_MONOTONIC */
+#elif __APPLE__
 #define HAVE_MACH_TIMER
 #include <mach/mach_time.h>
-#elif defined(_WIN32)
+#elif _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <malloc.h>
-#endif
+#else
+#error "This code only supports latest versions of GNU/Linux, macOS, and Windows."
+#endif /* __linux */
 
 static uint64_t ns() {
-    static uint64_t is_init = 0;
+    static bool initialized = false;
 
-#if defined(__APPLE__)
-    static mach_timebase_info_data_t info;
-    if (0 == is_init) {
-        mach_timebase_info(&info);
-        is_init = 1;
-    }
-    uint64_t now;
-    now = mach_absolute_time();
-    now *= info.numer;
-    now /= info.denom;
-
-    return now;
-#elif defined(__linux)
+#ifdef __linux
     static struct timespec linux_rate;
-    if (0 == is_init) {
+    if (!initialized) {
         clock_getres(CLOCKID, &linux_rate);
-        is_init = 1;
+        initialized = true;
     }
     uint64_t now;
     struct timespec spec;
@@ -49,11 +47,23 @@ static uint64_t ns() {
     now = spec.tv_sec * 1.0e9 + spec.tv_nsec;
 
     return now;
-#elif defined(_WIN32)
+#elif __APPLE__
+    static mach_timebase_info_data_t info;
+    if (!initialized) {
+        mach_timebase_info(&info);
+        initialized = true;
+    }
+    uint64_t now;
+    now = mach_absolute_time();
+    now *= info.numer;
+    now /= info.denom;
+
+    return now;
+#elif _WIN32
     static LARGE_INTEGER win_frequency;
-    if (0 == is_init) {
+    if (!initialized) {
         QueryPerformanceFrequency(&win_frequency);
-        is_init = 1;
+        initialized = true;
     }
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
@@ -64,6 +74,7 @@ static uint64_t ns() {
 
 #define PROGRAM_NAME "volume"
 #define WAV_HEADER_SIZE 44
+
 static uint8_t WAV_HEADER[WAV_HEADER_SIZE];
 
 int main(int argc, char *argv[])
@@ -144,10 +155,12 @@ int main(int argc, char *argv[])
         goto end;
     }
 
-#ifdef _WIN32
-    file_content = (int8_t *) _aligned_malloc(file_size, 32);
-#else
+#ifdef __linux
     file_content = (int8_t *) aligned_alloc(32, file_size);
+#elif __APPLE__
+    file_content = (int8_t *) aligned_alloc(16, file_size);
+#elif _WIN32
+    file_content = (int8_t *) _aligned_malloc(file_size, 32);
 #endif
     if (file_content == NULL) {
         perror("Not enough memory to load the input `.wav` file");
@@ -171,8 +184,14 @@ int main(int argc, char *argv[])
         samples[i] = (int32_t) ((float) samples[i] * volume_scale);
     }
 #else
+#ifdef __AVX512F__
+    // TODO: write your SIMD AVX-512 code here
+#elif __AVX2__
     // TODO: write your SIMD AVX/AVX2 code here
-#endif
+#elif __ARM_NEON
+    // OPTIONAL TODO: write your SIMD ARM Neon code here
+#endif /* __AVX512F__ */
+#endif /* USE_INTRINSICS */
 
     uint64_t stop_time = ns();
     uint64_t delta_time = stop_time - start_time;
@@ -191,9 +210,13 @@ int main(int argc, char *argv[])
     }
 
 end:
-    if (input_file_handle != NULL) {
-        fclose(input_file_handle);
-        input_file_handle = NULL;
+    if (file_content != NULL) {
+#if defined(__linux) || defined(__APPLE__)
+        free(file_content);
+#elif define(_WIN32)
+        _aligned_free(file_content);
+#endif
+        file_content = NULL;
     }
 
     if (output_file_handle != NULL) {
@@ -201,13 +224,9 @@ end:
         output_file_handle = NULL;
     }
 
-    if (file_content != NULL) {
-#ifdef _WIN32
-        _aligned_free(file_content);
-#else
-        free(file_content);
-#endif
-        file_content = NULL;
+    if (input_file_handle != NULL) {
+        fclose(input_file_handle);
+        input_file_handle = NULL;
     }
 
     return program_status;
