@@ -14,7 +14,7 @@ The aim of this project is to optimize a C program designed for adjusting the vo
 5. Execute the program with `./build/volume /srv/input.wav output.wav 0.2`.
 6. Open the `volume.c` file and locate the comments `// TODO: write your SIMD AVX/AVX2/AVX-512 code here`.
 7. Replace these comments with your AVX/AVX2/AVX-512 intrinsics to optimize the loop, aiming to improve the timing printed by the program by at least a factor of 3 (averaged over five profiling runs). Recompile the optimized code using `cmake . -B build -DUSE_INTRINSICS=ON -DPREFER_AVX512=OFF && cmake --build ./build`. To switch to AVX-512, compile with `cmake . -B build -DUSE_INTRINSICS=ON -DPREFER_AVX512=ON && cmake --build ./build`.
-8. To earn 3 bonus points, complete the optional `TODO` by writing SIMD ARM Neon code. You will need to determine how to compile, run, and test your ARM code.
+8. To earn 3 bonus points, complete the optional `TODO` by writing SIMD ARM Neon code. You will need to determine how to compile, run, and test your ARM code. To compile the code for ARM on an x86 machine, call `cmake` with the option `-DCMAKE_TOOLCHAIN_FILE=aarch64_toolchain.txt`. For example: `cmake . -B build -DUSE_INTRINSICS=ON -DCMAKE_TOOLCHAIN_FILE=aarch64_toolchain.txt && cmake --build ./build`. You need to have a cross-compiler on your machine or use the auca.space server.
 9. Verify that the volume of the `output.wav` file is correctly adjusted. For this, you can use a program like [Audacity](https://www.audacityteam.org).
 
 ## Rules
