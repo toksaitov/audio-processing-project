@@ -213,7 +213,7 @@ end:
     if (file_content != NULL) {
 #if defined(__linux) || defined(__APPLE__)
         free(file_content);
-#elif define(_WIN32)
+#elif defined(_WIN32)
         _aligned_free(file_content);
 #endif
         file_content = NULL;
