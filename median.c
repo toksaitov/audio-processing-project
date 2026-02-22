@@ -318,9 +318,9 @@ int main(int argc, char *argv[])
 
     size_t window_bytes = window_size * (window_size == 8 ? sizeof(double) : sizeof(float));
 #if defined(__linux) || defined(__APPLE__)
-    window = (float *) aligned_alloc(32, window_bytes);
+    window = (float *) aligned_alloc(64, window_bytes);
 #elif defined(_WIN32)
-    window = (float *) _aligned_malloc(window_bytes, 32);
+    window = (float *) _aligned_malloc(window_bytes, 64);
 #else
 #error "This code only supports latest versions of GNU/Linux, macOS, and Windows."
 #endif
@@ -370,7 +370,7 @@ int main(int argc, char *argv[])
             if (window_size == 8) {
                 double median;
                 if (window_size % 2 == 0) {
-                    median = (double_window[window_radius - 1] + double_window[window_radius]) * 0.5f;
+                    median = (double_window[window_radius - 1] + double_window[window_radius]) * 0.5;
                 } else {
                     median = double_window[window_radius];
                 }
